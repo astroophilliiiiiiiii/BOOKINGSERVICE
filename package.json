@@ -1,5 +1,8 @@
 {
   "name": "ts-template",
+  "prisma": {
+    "schema": "src/prisma/schema.prisma"
+  },
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
@@ -13,10 +16,10 @@
   "type": "module",
   "dependencies": {
     "@prisma/adapter-mariadb": "^7.8.0",
-    "@prisma/client": "^7.8.0",
+    "@prisma/client": "^6.19.3",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
-    "prisma": "^7.8.0",
+    "prisma": "^6.19.3",
     "uuid": "^14.0.0",
     "winston": "^3.19.0",
     "winston-daily-rotate-file": "^5.0.0",
