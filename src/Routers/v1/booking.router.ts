@@ -5,7 +5,7 @@ import { createBookingSchema } from "../../validators/booking.validator.js";
 
 const bookingRouter = express.Router() ; 
    
-bookingRouter.post("/" , validateRequestBody(createBookingSchema) , createBookingHandler ) ; 
+bookingRouter.post("/" , validateRequestBody(createBookingSchema) , createBookingHandler ) ;
 bookingRouter.post( "/confirm/:idempotencyKey" , confirmBookingHandler ) ; 
 
 export default bookingRouter ; 
