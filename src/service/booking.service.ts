@@ -1,33 +1,80 @@
 import { confirmBooking, createBooking , createIdempotencyKey, finalizeIdempotencyKey, getIdempotencyKeyWithLock  } from "../repositories/booking.repository.js";
-import { BadRequestError, NotFoundError } from "../utils/errors/app.error.js";
+import { BadRequestError, InternalServerError, NotFoundError } from "../utils/errors/app.error.js";
 import { generateIdempotencyKey } from "../utils/generateIdempotencyKey.js";
 import { CreateBookingDTO } from "../dto/booking.dto.js"
+import {serverConfig} from "../config/index.js"
 // iskaa logic goes to the repo layer 
 // here we need DTO that'll accept the input data + add some buisness logic 
-// some more col values then finally model Booking ready input goes to repo layer 
 
 // imported to make the confirmBooking as a transaction + put a lock on the idempotency row 
+// for same user concurrent request 
 import prismaClient from "../prisma/client.js"
+// for diff user concurrent request 
+import { redlock } from "../config/redis.config.js";
+
+
+
 
 // creating a booking properly -- entry in both the tables 
 export async function createBookingService( createBookingDTO : CreateBookingDTO ) {
 
-        const booking = await createBooking({
-            userId :  createBookingDTO.userId,
-            hotelId : createBookingDTO.hotelId,
-            totalGuests: createBookingDTO.totalGuests,
-            bookingAmount: createBookingDTO.bookingAmount,
+    const ttl = serverConfig.LOCK_TTL ; 
+    // "hotel:45 , user:7" --- ese likhke aayegaa , konse user ne kis hotel room ko book kiya 
+    const bookingResource = `hotel:${createBookingDTO.hotelId}` ;
+
+    // acquire a lock -- check if its available or not -- else give an error
+    // humne pehle lock leliya bina check kiye ki vo hai v available ke nahi  
+    let lock ; 
+
+    try{
+        lock = await redlock.acquire( [ bookingResource ] , ttl ) ; // checking lock we r able to acquire or not 
+
+
+        // ==================== ADDED LINES ====================
+        // Step 2: Lock milte hi DB se pucho kya ye hotel full ho chuka hai?
+        const existingBooking = await prismaClient.booking.findFirst({
+            where: { hotelId: createBookingDTO.hotelId }
         });
 
-        const idempotencyKey = generateIdempotencyKey();
+        if (existingBooking) {
+            throw new BadRequestError("This hotel is already booked!");
+        }
+        // ==============================================================
 
-        await createIdempotencyKey(idempotencyKey, booking.id);
 
-        return {
-            bookingId: booking.id,
-            idempotencyKey: idempotencyKey,
-        };
+        // lock lene ke baad + check krne baad ( hotel full toh ni ) -- creating a booking 
+            const booking = await createBooking({
+                userId :  createBookingDTO.userId,
+                hotelId : createBookingDTO.hotelId,
+                totalGuests: createBookingDTO.totalGuests,
+                bookingAmount: createBookingDTO.bookingAmount,
+            });
+
+            const idempotencyKey = generateIdempotencyKey();
+
+            await createIdempotencyKey(idempotencyKey, booking.id);
+
+            return {
+                bookingId: booking.id,
+                idempotencyKey: idempotencyKey,
+            };
+    //}) ;
+    }catch(err){
+        // in case the hotel is already booked !! 
+        if(err instanceof BadRequestError || err instanceof NotFoundError) {
+        throw err;
+        }
+
+        // redis lock error 
+        throw new InternalServerError(" Failed to acquire a lock for this resource ") ;
+    }
+
+     
 }
+
+
+
+
 
 
 // whenever function is declared await is always written ------------------------
