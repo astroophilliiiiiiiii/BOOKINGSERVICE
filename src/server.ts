@@ -5,6 +5,8 @@ import { v1Router } from "./Routers/v1/index.router.js";
 import { genericErrorHandler } from "./middlewares/error.middleware.js";
 import { logger } from "./config/logger.config.js"
 import { attachcorrelationIdMiddleware } from "./middlewares/correlation.middleware.js";
+import { addEmailToQueue } from "./producers/email.producer.js";
+import { NotificationDto } from "./dto/notification.dto.js";
 
 const app = express() ;  
 app.use(express.json() ) ; 
@@ -21,6 +23,19 @@ app.use( genericErrorHandler ) ;
 app.listen(PORT , ()=>{
     console.log("Server is listening on port:- " , PORT ) ; 
     logger.info("press Ctrl+C to stop the server " , {"kriti":"bansal"})
+
+    for( let i=0; i<10; i++ ){
+        const SampleNotification : NotificationDto = {
+        to : "sample", 
+        subject : "Sample Email", 
+        templateId : "Sample-template",
+        params : {
+            name : "jashan Dod",
+            orderId : "12345"
+        }
+        }
+        addEmailToQueue(SampleNotification)
+    }
 }) 
 
  
